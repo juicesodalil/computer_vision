@@ -17,15 +17,17 @@ class BoVW(nn.Module):
         self.fc = nn.Linear(num_clusters, 10)
 
     def forward(self, x):
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # 使用预训练好的resnet18抽取特征抽取特征，最后一层全联接不需要
         resnet18 = torchvision.models.resnet18(weights='DEFAULT')
+        resnet18.to(device)
         modules = list(resnet18.children())[:-1]
         feature_extractor = nn.Sequential(*modules)
         features = feature_extractor(x)
         features = features.view(features.size(0), -1)
 
         # 使用KMeans算法进行特征的聚类
-        features = features.detach().numpy()
+        features = features.detach().cpu().numpy()
         self.kmeans.fit(features)
         cluster_centers = self.kmeans.cluster_centers_
 
@@ -38,9 +40,12 @@ class BoVW(nn.Module):
 
         # 归一化直方图
         histogram /= np.sum(histogram)
-
+        histogram = torch.tensor(histogram)
+        histogram = histogram.to(torch.float32)
+        if torch.cuda.is_available():
+            histogram = histogram.cuda()
         # 直接过全联接层做分类
-        outputs = self.fc(torch.Tensor(histogram))
+        outputs = self.fc(histogram)
 
         return outputs
 
@@ -62,12 +67,13 @@ def train(model, criterion, optimizer, trainloader, device, num_epochs):
             print(f"[{i} / {len(trainloader)}], loss : {loss.item()}")
 
         print('Epoch [%d], Loss: %.4f' % (epoch + 1, running_loss / len(trainloader)))
-        print("save bow model")
-        torch.save(model.state_dict(), "./pretrain/bow.pth")
+    print("save bow model")
+    torch.save(model.state_dict(), f"../pretrain/bow-{num_epochs}.pth")
 
 
 # 超参数
-batch_size = 64
+batch_size = 128
+num_epochs = 1
 # 定义对数据集的预处理
 transform = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
@@ -88,18 +94,26 @@ model = BoVW(num_clusters=50)
 model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-train(model, criterion, optimizer, trainloader, device, num_epochs=10)
+is_pretrain = True
+if is_pretrain:
+    model.load_state_dict(torch.load(f"../pretrain/bow-{num_epochs}.pth"))
+    model.to(device)
+else:
+    train(model, criterion, optimizer, trainloader, device, num_epochs=num_epochs)
 
 # 测试模型
 correct = 0
 total = 0
+model.eval()
 with torch.no_grad():
     for data in testloader:
         images, labels = data
         images, labels = images.to(device), labels.to(device)
+        if images.shape[0] < 50:
+            continue
         outputs = model(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-print('Accuracy of the network on the 10000')
+        print("correct : %.2f%%" % ((correct / total) * 100))

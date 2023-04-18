@@ -8,6 +8,7 @@ from backbone import train, test
 """
     cifar10 和 cifar100 图像识别任务使用resnet
 """
+dataset_name = "cifar100"
 network_name = "resnet_50"
 batch_size = 128
 epochs = 40
@@ -48,10 +49,10 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5, 
 is_test = False
 
 if is_test:
-    model.load_state_dict(torch.load(f"pretrain/cifar10-{network_name}-{epochs}.pth", map_location="cuda:0"))
+    model.load_state_dict(torch.load(f"pretrain/{dataset_name}-{network_name}-{epochs}.pth", map_location="cuda:0"))
     model.to(device)
     test(model, test_loader, criterion, device, network_name)
 else:
-    # model.load_state_dict(torch.load(f"pretrain/cifar10-resnet_50-70.pth", map_location="cuda:0"))
+    # model.load_state_dict(torch.load(f"pretrain/cifar100-resnet_50-70.pth", map_location="cuda:0"))
     model.to(device)
     train(epochs, model, train_loader, criterion, optimizer, scheduler, device, network_name)
