@@ -36,7 +36,7 @@ test_set_100 = datasets.CIFAR100("./datasets/cifar100", train=False, transform=t
 train_loader = data.DataLoader(train_set_100, batch_size=batch_size, shuffle=True)
 test_loader = data.DataLoader(test_set_100, batch_size, shuffle=True)
 
-device = torch.device("cuda")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 得到模型
 model = ResidualNetwork.ResNet50(100)
 # model.to(device)
@@ -45,7 +45,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-3)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5, last_epoch=-1)
 
-is_test = True
+is_test = False
 
 if is_test:
     model.load_state_dict(torch.load(f"pretrain/cifar10-{network_name}-{epochs}.pth", map_location="cuda:0"))
