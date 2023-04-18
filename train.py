@@ -11,8 +11,9 @@ from backbone import train, test
 dataset_name = "cifar100"
 network_name = "resnet_50"
 batch_size = 128
-epochs = 40
+epochs = 100
 lr = 0.01
+num_classes = 100
 norm_mean = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
 norm_std = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
 transform_train = transforms.Compose([
@@ -39,7 +40,7 @@ test_loader = data.DataLoader(test_set_100, batch_size, shuffle=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 得到模型
-model = ResidualNetwork.ResNet50(100)
+model = ResidualNetwork.ResNet50(num_classes)
 # model.to(device)
 
 criterion = nn.CrossEntropyLoss()
@@ -53,6 +54,6 @@ if is_test:
     model.to(device)
     test(model, test_loader, criterion, device, network_name)
 else:
-    # model.load_state_dict(torch.load(f"pretrain/cifar100-resnet_50-70.pth", map_location="cuda:0"))
+    model.load_state_dict(torch.load(f"pretrain/{dataset_name}-{network_name}-70.pth", map_location="cuda:0"))
     model.to(device)
     train(epochs, model, train_loader, criterion, optimizer, scheduler, device, network_name)

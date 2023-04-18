@@ -94,7 +94,7 @@ model = BoVW(num_clusters=50)
 model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-is_pretrain = True
+is_pretrain = False
 if is_pretrain:
     model.load_state_dict(torch.load(f"../pretrain/bow-{num_epochs}.pth"))
     model.to(device)
