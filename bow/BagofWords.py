@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 from torch.utils import data
 
 
-# Define the Bag-of-Visual-Words model
+# 定义 Bag-of-Visual-Words model
 class BoVW(nn.Module):
     def __init__(self, num_clusters):
         super(BoVW, self).__init__()
@@ -17,41 +17,40 @@ class BoVW(nn.Module):
         self.fc = nn.Linear(num_clusters, 10)
 
     def forward(self, x):
-        # Extract features using pre-trained ResNet18
+        # 使用预训练好的resnet18抽取特征抽取特征，最后一层全联接不需要
         resnet18 = torchvision.models.resnet18(weights='DEFAULT')
         modules = list(resnet18.children())[:-1]
         feature_extractor = nn.Sequential(*modules)
         features = feature_extractor(x)
         features = features.view(features.size(0), -1)
 
-        # Cluster the features using KMeans
+        # 使用KMeans算法进行特征的聚类
         features = features.detach().numpy()
         self.kmeans.fit(features)
         cluster_centers = self.kmeans.cluster_centers_
 
-        # Assign the features to the nearest cluster center
+        # 将特征向量对应的聚类中心作为视觉词汇，将其出现次数统计为直方图，并对直方图进行归一化
         assignments = self.kmeans.predict(features)
         histogram = np.zeros((x.shape[0], self.num_clusters))
         for assignment in assignments:
             for i in range(histogram.shape[0]):
                 histogram[i][assignment] += 1
 
-        # Normalize the histogram
+        # 归一化直方图
         histogram /= np.sum(histogram)
 
-        # Classify the image using a linear classifier
+        # 直接过全联接层做分类
         outputs = self.fc(torch.Tensor(histogram))
 
         return outputs
 
 
-# Define the training loop
-def train(model, criterion, optimizer, trainloader, num_epochs):
+def train(model, criterion, optimizer, trainloader, device, num_epochs):
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
             inputs, labels = data
-
+            inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
 
             outputs = model(inputs)
@@ -69,7 +68,7 @@ def train(model, criterion, optimizer, trainloader, num_epochs):
 
 # 超参数
 batch_size = 64
-# Load the CIFAR10 dataset
+# 定义对数据集的预处理
 transform = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
@@ -83,18 +82,21 @@ trainloader = data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
 testset = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=False, download=True, transform=transform)
 testloader = data.DataLoader(testset, batch_size=batch_size, shuffle=False)
 
-# Train the model
+# 准备训练的模型优化器和损失函数
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = BoVW(num_clusters=50)
+model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-train(model, criterion, optimizer, trainloader, num_epochs=10)
+train(model, criterion, optimizer, trainloader, device, num_epochs=10)
 
-# Test the model
+# 测试模型
 correct = 0
 total = 0
 with torch.no_grad():
     for data in testloader:
         images, labels = data
+        images, labels = images.to(device), labels.to(device)
         outputs = model(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
